@@ -35,23 +35,24 @@ func sortFileContents(r *csv.Reader) int {
 		}
 
 		fmt.Printf("%s\n", transaction)
-		amazonTotal = filterTransactions(transaction, amazonTotal)
+		amazonTotal = filterTransactions("AMZN", transaction, amazonTotal)
+		amazonTotal = filterTransactions("Amazon", transaction, amazonTotal)
 	}
 	fmt.Printf("amazon: %.2f", amazonTotal)
 	return count
 }
 
-func filterTransactions(transaction []string, spendCategory float64) float64 {
+func filterTransactions(filterString string, transaction []string, categorySpend float64) float64 {
 
-	if strings.Contains(transaction[2], "Amazon") || strings.Contains(transaction[2], "AMZN") {
+	if strings.Contains(transaction[2], filterString) {
 		transactionAmount, err := strconv.ParseFloat(transaction[5], 64)
 		if err != nil {
 			log.Fatal(err)
 		}
-		spendCategory = spendCategory + transactionAmount
+		categorySpend = categorySpend + transactionAmount
 	}
 
-	return spendCategory
+	return categorySpend
 }
 
 func createFileReader() *csv.Reader {
