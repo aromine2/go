@@ -107,6 +107,7 @@ func createFileReader(file string) *csv.Reader {
 }
 
 func printCategoryResults(categories []category, numberOfCategories int) {
+	fullTotal := 0.00
 	for categoryIndex := 0; categoryIndex < numberOfCategories; categoryIndex++ {
 		currentCategory := categories[categoryIndex]
 		values := currentCategory.values
@@ -119,13 +120,15 @@ func printCategoryResults(categories []category, numberOfCategories int) {
 		}
 		sort.Strings(keys)
 
-		fullTotal := 0.00
+		categoryTotal := 0.00
 		// print sorted values from above step
 		for _, k := range keys {
 			fmt.Printf("%s %s: %.2f\n", name, k, values[k])
-			fullTotal = fullTotal + values[k]
+			categoryTotal = categoryTotal + values[k]
 		}
-		fmt.Printf("%s total: %.2f\n", name, fullTotal)
+		fmt.Printf("%s total: %.2f\n", name, categoryTotal)
+		fullTotal = fullTotal + categoryTotal
 	}
+	fmt.Printf("full total: %.2f\n", fullTotal)
 }
 
