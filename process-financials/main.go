@@ -10,17 +10,17 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"flag"
 )
 
 func main() {
 	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
-	//fileToOpen := "testfile.csv"
 	reader := createFileReader(fileToOpen)
 
 	// add categories to filter with here
 	categories := []category{
-		newCategory("all", []string{" "}),
-		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
+		newCategory("all", []string{"Sale"}),
+		//newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
 	}
 
 	sortFileContents(reader, categories)
@@ -66,8 +66,12 @@ func sortFileContents(reader *csv.Reader, allCategories []category) {
 func compareTransactionToFilter(filterString string, totalCategorySpend map[string]float64, transaction []string, transactionAdded *bool) map[string]float64 {
 
 	transactionDescription := transaction[2]
-	transactionType := transaction[3]
-	if strings.Contains(transactionDescription, filterString) || strings.Contains(transactionType, filterString) {
+	transactionCategory := transaction[3]
+	transactionType := transaction[4]
+
+	if strings.Contains(transactionDescription, filterString) ||
+		strings.Contains(transactionCategory, filterString) ||
+		strings.Contains(transactionType, filterString) {
 
 		// Get transaction amount
 		transactionAmount, err := strconv.ParseFloat(transaction[5], 64)
@@ -89,7 +93,7 @@ func compareTransactionToFilter(filterString string, totalCategorySpend map[stri
 		*transactionAdded = true
 
 		// to see exact transactions
-		//fmt.Printf("%s, %.2f, %s,\n", transactionDate.Format(transactionLayout), transactionAmount, transactionDescription)
+		fmt.Printf("%s, %.2f, %s,\n", transactionDate.Format(transactionLayout), transactionAmount, transactionDescription)
 	}
 
 	return totalCategorySpend
