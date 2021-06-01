@@ -14,6 +14,7 @@ func main() {
 	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
 	reader := createFileReader(fileToOpen)
 
+	// add categories to filter with here
 	categories := []category{
 		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
 	}
