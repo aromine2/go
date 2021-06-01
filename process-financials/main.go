@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -12,11 +14,25 @@ import (
 
 func main() {
 	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
+	//fileToOpen := "testfile.csv"
 	reader := createFileReader(fileToOpen)
 
 	// add categories to filter with here
 	categories := []category{
 		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
+		newCategory("dating", []string{
+			"MOVEMENT",
+			"TIE BAR",
+			"SOOPERS",
+			"ELDORA",
+			"PANERA BREAD",
+			"River and Woods",
+			"ROSARIO",
+			"OORRIDA",
+			"TOP GOLF",
+			"CRYSTAL",
+			"TST",
+		}),
 	}
 
 	sortFileContents(reader, categories)
@@ -25,36 +41,45 @@ func main() {
 func sortFileContents(reader *csv.Reader, allCategories []category) {
 	numberOfCategories := len(allCategories)
 
-	for categoryIndex := 0; categoryIndex < numberOfCategories; categoryIndex++ {
-		currentCategory := allCategories[categoryIndex]
-		for {
-	    	// Read each transaction from csv
-	    	transaction, err := reader.Read()
-	    	if err == io.EOF {
-	    		break
-	    	}
-	    	if err != nil {
-	    		log.Fatal(err)
-	    	}
+	for {
+		// Read each transaction from csv
+		transaction, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Fatal(err)
+		}
 
-			// loop through each filter in the category
-			numberOfFilters := len(currentCategory.filters)
+		for categoryIndex := 0; categoryIndex < numberOfCategories; categoryIndex++ {
+			currentCategory := allCategories[categoryIndex]
+
+		    // loop through each filter in the category
+	    	numberOfFilters := len(currentCategory.filters)
 	    	for filterIndex := 0; filterIndex < numberOfFilters; filterIndex++ {
-	    		currentFilter := currentCategory.filters[filterIndex]
-	    		compareTransactionToFilter(currentFilter, currentCategory.values, transaction)
-			}
-	    }
 
-	    // left at end so it can add everything together
-		printCategoryResults(currentCategory)
+	    		transactionAdded := false
+	    		currentFilter := currentCategory.filters[filterIndex]
+
+	    		compareTransactionToFilter(currentFilter, currentCategory.values, transaction, &transactionAdded)
+
+	    		if transactionAdded {
+	    			break
+	    		}
+	    	}
+	    }
 	}
+
+	// left at end so it can add everything together
+	printCategoryResults(allCategories, numberOfCategories)
 
 }
 
-func compareTransactionToFilter(filterString string, totalCategorySpend map[string]float64, transaction []string) map[string]float64 {
+func compareTransactionToFilter(filterString string, totalCategorySpend map[string]float64, transaction []string, transactionAdded *bool) map[string]float64 {
 
 	transactionDescription := transaction[2]
-	if strings.Contains(transactionDescription, filterString) {
+	transactionType := transaction[3]
+	if strings.Contains(transactionDescription, filterString) || strings.Contains(transactionType, filterString) {
 
 		// Get transaction amount
 		transactionAmount, err := strconv.ParseFloat(transaction[5], 64)
@@ -73,6 +98,10 @@ func compareTransactionToFilter(filterString string, totalCategorySpend map[stri
 		monthSpend := transactionDate.Format(sortingLayout)
 		// Add transaction value to the monthly total
 		totalCategorySpend[monthSpend] = totalCategorySpend[monthSpend] + transactionAmount
+		*transactionAdded = true
+
+		// to see exact transactions
+		//fmt.Printf("%s, %.2f, %s,\n", transactionDate.Format(transactionLayout), transactionAmount, transactionDescription)
 	}
 
 	return totalCategorySpend
@@ -89,3 +118,27 @@ func createFileReader(file string) *csv.Reader {
 	r := csv.NewReader(csvfile)
 	return r
 }
+
+func printCategoryResults(categories []category, numberOfCategories int) {
+	for categoryIndex := 0; categoryIndex < numberOfCategories; categoryIndex++ {
+		currentCategory := categories[categoryIndex]
+		values := currentCategory.values
+		name := currentCategory.name
+
+		// make new slice of strings so keys can be sorted
+		keys := make([]string, 0, len(values))
+		for key := range values {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+
+		fullTotal := 0.00
+		// print sorted values from above step
+		for _, k := range keys {
+			fmt.Printf("%s %s: %.2f\n", name, k, values[k])
+			fullTotal = fullTotal + values[k]
+		}
+		fmt.Printf("%s total: %.2f\n", name, fullTotal)
+	}
+}
+
