@@ -19,6 +19,7 @@ func main() {
 
 	// add categories to filter with here
 	categories := []category{
+		newCategory("all", []string{" "}),
 		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
 	}
 
