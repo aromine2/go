@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -10,11 +11,19 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"flag"
 )
 
 func main() {
-	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
+	var fileToOpen string
+	flag.StringVar(&fileToOpen, "f", "", "File to be processed")
+	flag.Parse()
+
+	// Make sure -f flag set
+	if fileToOpen == "" {
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
 	reader := createFileReader(fileToOpen)
 
 	// add categories to filter with here
@@ -137,3 +146,17 @@ func printCategoryResults(categories []category, numberOfCategories int) {
 	fmt.Printf("full total: %.2f\n", fullTotal)
 }
 
+// use the function, not the struct directly
+type category struct {
+	name string
+	filters []string
+	values map[string]float64
+}
+
+func newCategory(name string, filters []string) category {
+	return category{
+		name: name,
+		filters: filters,
+		values: make(map[string]float64),
+	}
+}
