@@ -2,64 +2,60 @@ package main
 
 import (
 	"encoding/csv"
-	"fmt"
 	"io"
 	"log"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
 func main() {
-	// Open the file
-	r := createFileReader()
+	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
+	reader := createFileReader(fileToOpen)
 
-	sortFileContents(r)
-}
-
-func sortFileContents(r *csv.Reader) {
-	// Categories to sort transactions by
-	var (
-		amazonTotals = make(map[string]float64)
-	)
-
-	for {
-		// Read each transaction from csv
-		transaction, err := r.Read()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		amazonTotals = filterTransactions("AMZN", amazonTotals, transaction)
-		amazonTotals = filterTransactions("Amazon", amazonTotals, transaction)
+	categories := []category{
+		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
 	}
 
-	printCategoryResults(amazonTotals)
+	sortFileContents(reader, categories)
 }
 
-func printCategoryResults(amazonTotals map[string]float64) {
-	keys := make([]string, 0, len(amazonTotals))
-	for k := range amazonTotals {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+func sortFileContents(reader *csv.Reader, allCategories []category) {
+	numberOfCategories := len(allCategories)
 
-	fullTotal := 0.00
-	for _, k := range keys {
-		fmt.Printf("%s: %.2f\n", k, amazonTotals[k])
-		fullTotal = fullTotal + amazonTotals[k]
+	for categoryIndex := 0; categoryIndex < numberOfCategories; categoryIndex++ {
+		currentCategory := allCategories[categoryIndex]
+		for {
+	    	// Read each transaction from csv
+	    	transaction, err := reader.Read()
+	    	if err == io.EOF {
+	    		break
+	    	}
+	    	if err != nil {
+	    		log.Fatal(err)
+	    	}
+
+			// loop through each filter in the category
+			numberOfFilters := len(currentCategory.filters)
+	    	for filterIndex := 0; filterIndex < numberOfFilters; filterIndex++ {
+	    		currentFilter := currentCategory.filters[filterIndex]
+	    		compareTransactionToFilter(currentFilter, currentCategory.values, transaction)
+			}
+	    }
+
+	    // left at end so it can add everything together
+		printCategoryResults(currentCategory)
 	}
-	fmt.Printf("full total: %.2f\n", fullTotal)
+
 }
 
-func filterTransactions(filterString string, totalCategorySpend map[string]float64, transaction []string) map[string]float64 {
+func compareTransactionToFilter(filterString string, totalCategorySpend map[string]float64, transaction []string) map[string]float64 {
 
-	if strings.Contains(transaction[2], filterString) {
+	transactionDescription := transaction[2]
+	if strings.Contains(transactionDescription, filterString) {
+
+		// Get transaction amount
 		transactionAmount, err := strconv.ParseFloat(transaction[5], 64)
 		if err != nil {
 			log.Fatal(err)
@@ -67,26 +63,23 @@ func filterTransactions(filterString string, totalCategorySpend map[string]float
 
 		const transactionLayout = "01/02/2006"
 		const sortingLayout= "2006 01"
+		// Get the date of the transaction
 	    transactionDate, err := time.Parse(transactionLayout, transaction[0])
 	    if err != nil {
 	    	log.Fatal(err)
 		}
 
 		monthSpend := transactionDate.Format(sortingLayout)
+		// Add transaction value to the monthly total
 		totalCategorySpend[monthSpend] = totalCategorySpend[monthSpend] + transactionAmount
-	    //if _, ok := totalCategorySpend[monthSpend]; ok {
-		//	totalCategorySpend[monthSpend] = totalCategorySpend[monthSpend] + transactionAmount
-		//} else {
-		//	totalCategorySpend[monthSpend] = transactionAmount
-		//}
 	}
 
 	return totalCategorySpend
 }
 
-func createFileReader() *csv.Reader {
-	fileToOpen := "Chase8873_Activity20200501_20210527_20210527.CSV"
-	csvfile, err := os.Open(fileToOpen)
+func createFileReader(file string) *csv.Reader {
+	// Open the file
+	csvfile, err := os.Open(file)
 	if err != nil {
 		log.Fatalln("Couldn't open the csv file", err)
 	}
