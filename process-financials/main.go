@@ -20,19 +20,6 @@ func main() {
 	// add categories to filter with here
 	categories := []category{
 		newCategory("amazonTotal", []string{"AMZN", "Amazon"}),
-		newCategory("dating", []string{
-			"MOVEMENT",
-			"TIE BAR",
-			"SOOPERS",
-			"ELDORA",
-			"PANERA BREAD",
-			"River and Woods",
-			"ROSARIO",
-			"OORRIDA",
-			"TOP GOLF",
-			"CRYSTAL",
-			"TST",
-		}),
 	}
 
 	sortFileContents(reader, categories)
