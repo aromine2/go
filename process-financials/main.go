@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/csv"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,15 +13,7 @@ import (
 )
 
 func main() {
-	var fileToOpen string
-	flag.StringVar(&fileToOpen, "f", "", "File to be processed")
-	flag.Parse()
-
-	// Make sure -f flag set
-	if fileToOpen == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
-	}
+	fileToOpen := processArgs()
 
 	reader := createFileReader(fileToOpen)
 
@@ -33,6 +24,11 @@ func main() {
 	}
 
 	sortFileContents(reader, categories)
+}
+
+// return a struct from processArgs with all the necessary stuff
+type config struct {
+	fileName string
 }
 
 func sortFileContents(reader *csv.Reader, allCategories []category) {
