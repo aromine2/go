@@ -34,14 +34,6 @@ func main() {
 	stockSymbol := processArgs()
 	apiKey := os.Getenv("ALPHA_ADVANTAGE_PW")
 
-	//balanceSheet := getInfoFromApi("BALANCE_SHEET", stockSymbol, apiKey)
-	//balanceSheetObject := convertBalanceSheetToObject(balanceSheet)
-
-	//// Need to find a way to filter on the latest
-	//fmt.Printf("%s\n", balanceSheet)
-
-
-
 	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
 	incomeStatementObject := convertIncomeStatementToObject(incomeStatement)
 	projectedRevenue := calculateAverageYearlyRevenueGrowth(incomeStatementObject)
@@ -79,14 +71,6 @@ func main() {
 	fmt.Printf("25 percent price: %.2f\n", priceEstimate / math.Pow(1.25, 5))
 	fmt.Printf("30 percent price: %.2f\n", priceEstimate / math.Pow(1.30, 5))
 
-	// DONE, Get revenue growth rate over the last 4-5 years (%Inc = (F - I) / I)
-	// DONE, Average that, then project 5 years out. Then take 90% of that to be conservative
-	// DONE, Get shares growth rate over the last several years, balanceSheet as commonStockSharesOutstanding
-	// DONE, Avg and project. Multiply by 1.1 to be conservative
-	// DONE, Take average net profit to the projected revenue as a percent, aka get the margin
-	// DONE, Take the current P/E and multiply by .75 to be conservative
-	// DONE, Return price estimate 5 years out
-	// Return "today's stock price to buy at"; 15%, 20%, 25%, 30%
 }
 
 func calculateAverageMargin(incomeStatementObject incomeStatementResponse) float64 {
