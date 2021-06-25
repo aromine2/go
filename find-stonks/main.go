@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -38,12 +38,10 @@ func main() {
 	//// Need to find a way to filter on the latest
 	//fmt.Println(balanceSheetObject.AnnualReports[3]["longTermDebt"])
 
-	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
-	incomeStatementObject := convertIncomeStatementToObject(incomeStatement)
+	averageRevenueGrowthPercent := calculateAverageYearlyRevenueGrowth(stockSymbol, apiKey)
+	fmt.Println(averageRevenueGrowthPercent)
 
-	fmt.Printf("%s", incomeStatementObject)
-
-	// Get revenue growth rate over the last 4-5 years
+	// Get revenue growth rate over the last 4-5 years (%Inc = (F - I) / I)
 	// Average that, then project 5 years out. Then take 90% of that to be conservative
 	// Get shares growth rate over the last several years
 	// Avg and project. Multiply by 1.1 to be conservative
@@ -53,11 +51,43 @@ func main() {
 	// Return "today's stock price to buy at"; 15%, 20%, 25%, 30%
 }
 
+func calculateAverageYearlyRevenueGrowth(stockSymbol string, apiKey string) float64 {
+	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
+	incomeStatementObject := convertIncomeStatementToObject(incomeStatement)
+
+	incomeAnnualStatements := incomeStatementObject.AnnualReports
+	var totalRevenueGrowthPercent float64
+	yearsOfData := len(incomeAnnualStatements)
+
+	// its conceivable there could be a bug if the AnnualReports are returned out order
+	for i := 0; i < yearsOfData - 1; i++ {
+		yearlyRevenueString := incomeAnnualStatements[i]["totalRevenue"]
+		previousYearlyRevenueString := incomeAnnualStatements[i+1]["totalRevenue"]
+
+		yearlyRevenue, err := strconv.Atoi(yearlyRevenueString)
+		if err != nil {
+			panic(err)
+		}
+		previousYearlyRevenue, err := strconv.Atoi(previousYearlyRevenueString)
+		if err != nil {
+			panic(err)
+		}
+
+		// For some reason this did not want to work with int, I kept getting 0 and had to make them all floats
+		yearlyRevenueGrowthPercent := float64(yearlyRevenue - previousYearlyRevenue) / float64(previousYearlyRevenue)
+		totalRevenueGrowthPercent = totalRevenueGrowthPercent + yearlyRevenueGrowthPercent
+	}
+	// yearsOfData - 1 because that's the number of comparisons that can be made
+	averageRevenueGrowthPercent := totalRevenueGrowthPercent / float64(yearsOfData - 1)
+
+	return averageRevenueGrowthPercent
+}
+
 func convertIncomeStatementToObject(apiOutput []byte) incomeStatementResponse {
 	var newObject incomeStatementResponse
 
 	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
-		log.Println(err)
+		panic(err)
 	}
 
 	return newObject
@@ -67,7 +97,7 @@ func convertBalanceSheetToObject(apiOutput []byte) balanceSheetResponse {
 	var newObject balanceSheetResponse
 
 	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
-		log.Println(err)
+		panic(err)
 	}
 
 	return newObject
