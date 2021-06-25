@@ -7,35 +7,70 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 )
 
+type incomeStatementResponse struct {
+	Symbol           string
+	AnnualReports    []map[string]string
+	QuarterlyReports []map[string]string
+}
+
 type balanceSheetResponse struct {
-	Symbol    string
-	AnnualReports   []map[string]string
-	QuarterlyReports   []map[string]string
+	Symbol           string
+	AnnualReports    []map[string]string
+	QuarterlyReports []map[string]string
+}
+
+type yearlyResults struct {
+	Year                 time.Time
+	RevenueGrowthPercent float64
+	SharesGrowthPercent  float64
 }
 
 func main() {
 	stockSymbol := processArgs()
 	apiKey := os.Getenv("ALPHA_ADVANTAGE_PW")
-	stockFunction := "BALANCE_SHEET"
 
-	balanceSheet := getInfoFromApi(stockFunction, stockSymbol, apiKey)
-	balanceSheetObject := processBalanceSheet(balanceSheet)
+	//balanceSheet := getInfoFromApi("BALANCE_SHEET", stockSymbol, apiKey)
+	//balanceSheetObject := convertBalanceSheetToObject(balanceSheet)
+	//
+	//// Need to find a way to filter on the latest
+	//fmt.Println(balanceSheetObject.AnnualReports[3]["longTermDebt"])
 
-	// Need to find a way to filter on the latest
-	fmt.Println(balanceSheetObject.AnnualReports[3]["longTermDebt"])
+	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
+	incomeStatementObject := convertIncomeStatementToObject(incomeStatement)
+
+	fmt.Printf("%s", incomeStatementObject)
+
+	// Get revenue growth rate over the last 4-5 years
+	// Average that, then project 5 years out. Then take 90% of that to be conservative
+	// Get shares growth rate over the last several years
+	// Avg and project. Multiply by 1.1 to be conservative
+	// Take average net profit to the projected revenue as a percent
+	// Take the current P/E and multiply by .75 to be conservative
+	// Return price estimate 5 years out
+	// Return "today's stock price to buy at"; 15%, 20%, 25%, 30%
 }
 
-func processBalanceSheet(balanceSheet []byte) balanceSheetResponse {
-	var stockBalanceSheet balanceSheetResponse
+func convertIncomeStatementToObject(apiOutput []byte) incomeStatementResponse {
+	var newObject incomeStatementResponse
 
-	err := json.Unmarshal(balanceSheet, &stockBalanceSheet)
-	if err != nil {
+	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
 		log.Println(err)
 	}
 
-	return stockBalanceSheet
+	return newObject
+}
+
+func convertBalanceSheetToObject(apiOutput []byte) balanceSheetResponse {
+	var newObject balanceSheetResponse
+
+	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
+		log.Println(err)
+	}
+
+	return newObject
 }
 
 func getInfoFromApi(stockFunction string, stockSymbol string, apiKey string) []byte {
