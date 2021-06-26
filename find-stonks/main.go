@@ -9,16 +9,11 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
-type incomeStatementResponse struct {
-	Symbol           string
-	AnnualReports    []map[string]string
-	QuarterlyReports []map[string]string
-}
-
-type balanceSheetResponse struct {
+type financialsResponse struct {
 	Symbol           string
 	AnnualReports    []map[string]string
 	QuarterlyReports []map[string]string
@@ -35,45 +30,49 @@ func main() {
 	apiKey := os.Getenv("ALPHA_ADVANTAGE_PW")
 
 	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
-	incomeStatementObject := convertIncomeStatementToObject(incomeStatement)
-	projectedRevenue := calculateAverageYearlyRevenueGrowth(incomeStatementObject)
-	fmt.Printf("proj revenue: %f\n", projectedRevenue)
-	fmt.Println("")
+	incomeStatementObject := convertFinancialsResponseToObject(incomeStatement)
+	projectedRevenue := calculateAverageYearlyMetricGrowth("totalRevenue", incomeStatementObject)
 
 	balanceSheet := getInfoFromApi("BALANCE_SHEET", stockSymbol, apiKey)
-	balanceSheetObject := convertBalanceSheetToObject(balanceSheet)
-	projectedShares := calculateAverageYearlyShareGrowth(balanceSheetObject)
-	fmt.Printf("proj share count: %f\n", projectedShares)
-	fmt.Println("")
+	balanceSheetObject := convertFinancialsResponseToObject(balanceSheet)
+	projectedShares := calculateAverageYearlyMetricGrowth("commonStockSharesOutstanding", balanceSheetObject)
 
 	averageMargin := calculateAverageMargin(incomeStatementObject)
-	fmt.Printf("avg margin: %f\n", averageMargin)
-	fmt.Println("")
 
 	companyOverview := getInfoFromApi("OVERVIEW", stockSymbol, apiKey)
 	companyOverviewObject := convertCompanyOverviewToObject(companyOverview)
+	adjustedPE := adjustCurrentPE(companyOverviewObject)
+
+	outputPriceEstimates(adjustedPE, averageMargin, projectedRevenue, projectedShares)
+}
+
+func outputPriceEstimates(adjustedPE float64, averageMargin float64, projectedRevenue float64, projectedShares float64) {
+	priceEstimate := adjustedPE * averageMargin * projectedRevenue / projectedShares
+	fmt.Println("")
+	fmt.Printf("5 yr priceEstimate: %.2f\n", priceEstimate)
+	fmt.Printf("15 percent price: %.2f\n", priceEstimate/math.Pow(1.15, 5))
+	fmt.Printf("20 percent price: %.2f\n", priceEstimate/math.Pow(1.20, 5))
+	fmt.Printf("25 percent price: %.2f\n", priceEstimate/math.Pow(1.25, 5))
+	fmt.Printf("30 percent price: %.2f\n", priceEstimate/math.Pow(1.30, 5))
+}
+
+func adjustCurrentPE(companyOverviewObject map[string]string) float64 {
 	currentPEString := companyOverviewObject["PERatio"]
 	currentPE, err := strconv.ParseFloat(currentPEString, 64)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	adjustedPE := currentPE * .8
+
+	fmt.Println("")
 	fmt.Printf("current PE: %f\n", currentPE)
 	fmt.Printf("adjusted PE: %f\n", adjustedPE)
-	fmt.Println("")
 
-	priceEstimate := adjustedPE * averageMargin * projectedRevenue / projectedShares
-	fmt.Printf("priceEstimate: %.2f\n", priceEstimate)
-
-
-	fmt.Printf("15 percent price: %.2f\n", priceEstimate / math.Pow(1.15, 5))
-	fmt.Printf("20 percent price: %.2f\n", priceEstimate / math.Pow(1.20, 5))
-	fmt.Printf("25 percent price: %.2f\n", priceEstimate / math.Pow(1.25, 5))
-	fmt.Printf("30 percent price: %.2f\n", priceEstimate / math.Pow(1.30, 5))
-
+	return adjustedPE
 }
 
-func calculateAverageMargin(incomeStatementObject incomeStatementResponse) float64 {
+func calculateAverageMargin(incomeStatementObject financialsResponse) float64 {
 	incomeAnnualStatements := incomeStatementObject.AnnualReports
 	var totalMargin float64
 	yearsOfData := len(incomeAnnualStatements)
@@ -99,110 +98,73 @@ func calculateAverageMargin(incomeStatementObject incomeStatementResponse) float
 	// yearsOfData - 1 because that's the number of comparisons that can be made
 	averageMargin := totalMargin / float64(yearsOfData - 1)
 
+	fmt.Println("")
+	fmt.Printf("avg margin: %f\n", averageMargin)
+
 	return averageMargin
 }
 
-func calculateAverageYearlyShareGrowth(balanceSheetObject balanceSheetResponse) float64 {
+func calculateAverageYearlyMetricGrowth(metric string, financialsObject financialsResponse) float64 {
 
-	balanceSheetAnnuals := balanceSheetObject.AnnualReports
-	var totalShareGrowthPercent float64
-	yearsOfData := len(balanceSheetAnnuals)
+	annualReports := financialsObject.AnnualReports
+	var totalMetricGrowthPercent float64
+	yearsOfData := len(annualReports)
 
 	// its conceivable there could be a bug if the AnnualReports are returned out order
 	for i := 0; i < yearsOfData - 1; i++ {
-		shareCountString := balanceSheetAnnuals[i]["commonStockSharesOutstanding"]
-		previousShareCountString := balanceSheetAnnuals[i+1]["commonStockSharesOutstanding"]
+		currentMetricString := annualReports[i][metric]
+		previousMetricString := annualReports[i+1][metric]
 
-		currentShareCount, err := strconv.Atoi(shareCountString)
+		currentMetric, err := strconv.Atoi(currentMetricString)
 		if err != nil {
 			log.Fatal(err)
 		}
-		previousShareCount, err := strconv.Atoi(previousShareCountString)
+		previousMetric, err := strconv.Atoi(previousMetricString)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 		// For some reason this did not want to work with int, I kept getting 0 and had to make them all floats
-		yearlyShareGrowthPercent := float64(currentShareCount- previousShareCount) / float64(previousShareCount)
-		totalShareGrowthPercent = totalShareGrowthPercent + yearlyShareGrowthPercent
+		yearlyMetricGrowthPercent := float64(currentMetric-previousMetric) / float64(previousMetric)
+		totalMetricGrowthPercent = totalMetricGrowthPercent + yearlyMetricGrowthPercent
 	}
-	// yearsOfData - 1 because that's the number of comparisons that can be made
-	averageShareGrowthPercent := totalShareGrowthPercent / float64(yearsOfData - 1)
+	numberOfComparisions := float64(yearsOfData - 1)
+	averageMetricGrowthPercent := totalMetricGrowthPercent / numberOfComparisions
 
-	return fiveYearShareProjection(averageShareGrowthPercent, balanceSheetAnnuals)
+	fmt.Println("")
+	fmt.Printf("years of %s data: %v\n", metric, yearsOfData)
+
+	return fiveYearMetricProjection(metric, averageMetricGrowthPercent, annualReports)
 }
 
-func fiveYearShareProjection(averageShareGrowthPercent float64, balanceSheetAnnuals []map[string]string) float64 {
-	// multiply by 1.1 to be conservative
-	adjustedAverageShareGrowthPercent := averageShareGrowthPercent * 1.1
-	projectionMultiple := math.Pow(1+adjustedAverageShareGrowthPercent, 5)
-	latestShareCount, err := strconv.ParseFloat(balanceSheetAnnuals[0]["commonStockSharesOutstanding"], 64)
+func fiveYearMetricProjection(metric string, percentChange float64, financialsObject []map[string]string) float64 {
+	var adjustedPercentChange float64
+	if strings.Contains(metric, "Revenue") {
+		// multiply by .9 to assume less revenue
+		adjustedPercentChange = percentChange * .9
+	} else if strings.Contains(metric, "StockShares") {
+		// multiply by 1.1 to assume more shares outstanding
+		adjustedPercentChange = percentChange * 1.1
+	}
+	projectionMultiple := math.Pow(1+adjustedPercentChange, 5)
+	latestMetricCount, err := strconv.ParseFloat(financialsObject[0][metric], 64)
 	if err != nil {
 		log.Fatal(err)
 	}
-	sharesInFiveYears := projectionMultiple * latestShareCount / 1000000
 
-	fmt.Printf("current share count: %f\n", latestShareCount / 1000000)
-	return sharesInFiveYears
+	// divide by 1 mil for easier numbers
+	adjustedMetric := latestMetricCount / 1000000
+	metricInFiveYears := projectionMultiple * adjustedMetric
+
+	fmt.Printf("%s latest: %.3f\n", metric, adjustedMetric)
+	fmt.Printf("yoy percent change: %.3f\n", adjustedPercentChange)
+	fmt.Printf("5 year projection: %.3f\n", metricInFiveYears)
+	return metricInFiveYears
 }
 
-func calculateAverageYearlyRevenueGrowth(incomeStatementObject incomeStatementResponse) float64 {
-
-	incomeAnnualStatements := incomeStatementObject.AnnualReports
-	var totalRevenueGrowthPercent float64
-	yearsOfData := len(incomeAnnualStatements)
-
-	// its conceivable there could be a bug if the AnnualReports are returned out order
-	for i := 0; i < yearsOfData - 1; i++ {
-		yearlyRevenueString := incomeAnnualStatements[i]["totalRevenue"]
-		previousYearlyRevenueString := incomeAnnualStatements[i+1]["totalRevenue"]
-
-		yearlyRevenue, err := strconv.Atoi(yearlyRevenueString)
-		if err != nil {
-			log.Fatal(err)
-		}
-		previousYearlyRevenue, err := strconv.Atoi(previousYearlyRevenueString)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		// For some reason this did not want to work with int, I kept getting 0 and had to make them all floats
-		yearlyRevenueGrowthPercent := float64(yearlyRevenue - previousYearlyRevenue) / float64(previousYearlyRevenue)
-		totalRevenueGrowthPercent = totalRevenueGrowthPercent + yearlyRevenueGrowthPercent
-	}
-	// yearsOfData - 1 because that's the number of comparisons that can be made
-	averageRevenueGrowthPercent := totalRevenueGrowthPercent / float64(yearsOfData - 1)
-
-	return fiveYearRevenueProjection(averageRevenueGrowthPercent, incomeAnnualStatements)
-}
-
-func fiveYearRevenueProjection(averageRevenueGrowthPercent float64, incomeAnnualStatements []map[string]string) float64 {
-	// multiply by .9 to be conservative
-	adjustedAverageRevenueGrowthPercent := averageRevenueGrowthPercent * .9
-	projectionMultiple := math.Pow(1+adjustedAverageRevenueGrowthPercent, 5)
-	latestRevenueCount, err := strconv.ParseFloat(incomeAnnualStatements[0]["totalRevenue"], 64)
-	if err != nil {
-		log.Fatal(err)
-	}
-	revenueInFiveYears := projectionMultiple * latestRevenueCount / 1000000
-
-	fmt.Printf("latest: %f\n", latestRevenueCount / 1000000)
-	fmt.Printf("adj revenue growth: %f\n", adjustedAverageRevenueGrowthPercent)
-	return revenueInFiveYears
-}
-
-func convertIncomeStatementToObject(apiOutput []byte) incomeStatementResponse {
-	var newObject incomeStatementResponse
-
-	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
-		log.Fatal(err)
-	}
-
-	return newObject
-}
-
-func convertBalanceSheetToObject(apiOutput []byte) balanceSheetResponse {
-	var newObject balanceSheetResponse
+// can probably change newObject and return type to interface{}
+func convertFinancialsResponseToObject(apiOutput []byte) financialsResponse {
+	var newObject financialsResponse
 
 	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
 		log.Fatal(err)
