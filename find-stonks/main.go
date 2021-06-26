@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -93,7 +92,7 @@ func calculateAverageMargin(incomeStatementObject financialsResponse) float64 {
 
 		// For some reason this did not want to work with int, I kept getting 0 and had to make them all floats
 		margin := float64(yearlyNetIncome) / float64(yearlyRevenue)
-		totalMargin = totalMargin + margin
+		totalMargin += margin
 	}
 	// yearsOfData - 1 because that's the number of comparisons that can be made
 	averageMargin := totalMargin / float64(yearsOfData - 1)
@@ -126,26 +125,28 @@ func calculateAverageYearlyMetricGrowth(metric string, financialsObject financia
 
 		// For some reason this did not want to work with int, I kept getting 0 and had to make them all floats
 		yearlyMetricGrowthPercent := float64(currentMetric-previousMetric) / float64(previousMetric)
-		totalMetricGrowthPercent = totalMetricGrowthPercent + yearlyMetricGrowthPercent
+		totalMetricGrowthPercent += yearlyMetricGrowthPercent
 	}
 	numberOfComparisions := float64(yearsOfData - 1)
 	averageMetricGrowthPercent := totalMetricGrowthPercent / numberOfComparisions
 
 	fmt.Println("")
-	fmt.Printf("years of %s data: %v\n", metric, yearsOfData)
+	fmt.Printf("%s years of data: %v\n", metric, yearsOfData)
 
 	return fiveYearMetricProjection(metric, averageMetricGrowthPercent, annualReports)
 }
 
 func fiveYearMetricProjection(metric string, percentChange float64, financialsObject []map[string]string) float64 {
 	var adjustedPercentChange float64
-	if strings.Contains(metric, "Revenue") {
+	switch metric {
+	case "totalRevenue":
 		// multiply by .9 to assume less revenue
 		adjustedPercentChange = percentChange * .9
-	} else if strings.Contains(metric, "StockShares") {
+	case "commonStockSharesOutstanding":
 		// multiply by 1.1 to assume more shares outstanding
 		adjustedPercentChange = percentChange * 1.1
 	}
+
 	projectionMultiple := math.Pow(1+adjustedPercentChange, 5)
 	latestMetricCount, err := strconv.ParseFloat(financialsObject[0][metric], 64)
 	if err != nil {
