@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-type financialsResponse struct {
+type FinancialsResponse struct {
 	Symbol           string
 	AnnualReports    []map[string]string
 	QuarterlyReports []map[string]string
@@ -27,20 +27,22 @@ type yearlyResults struct {
 func main() {
 	stockSymbol := processArgs()
 	apiKey := os.Getenv("ALPHA_ADVANTAGE_PW")
+	//currentPrice := GetInfoFromApi("GLOBAL_QUOTE", stockSymbol, apiKey)
+	//fmt.Printf("current price: %f\n", currentPrice)
 
-	incomeStatement := getInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
-	incomeStatementObject := convertFinancialsResponseToObject(incomeStatement)
-	projectedRevenue := calculateAverageYearlyMetricGrowth("totalRevenue", incomeStatementObject)
+	incomeStatement := GetInfoFromApi("INCOME_STATEMENT", stockSymbol, apiKey)
+	incomeStatementObject := ConvertFinancialsResponseToObject(incomeStatement)
+	projectedRevenue := CalculateAverageYearlyMetricGrowth("totalRevenue", incomeStatementObject)
 
-	balanceSheet := getInfoFromApi("BALANCE_SHEET", stockSymbol, apiKey)
-	balanceSheetObject := convertFinancialsResponseToObject(balanceSheet)
-	projectedShares := calculateAverageYearlyMetricGrowth("commonStockSharesOutstanding", balanceSheetObject)
+	balanceSheet := GetInfoFromApi("BALANCE_SHEET", stockSymbol, apiKey)
+	balanceSheetObject := ConvertFinancialsResponseToObject(balanceSheet)
+	projectedShares := CalculateAverageYearlyMetricGrowth("commonStockSharesOutstanding", balanceSheetObject)
 
-	averageMargin := calculateAverageMargin(incomeStatementObject)
+	averageMargin := CalculateAverageMargin(incomeStatementObject)
 
-	companyOverview := getInfoFromApi("OVERVIEW", stockSymbol, apiKey)
-	companyOverviewObject := convertCompanyOverviewToObject(companyOverview)
-	adjustedPE := adjustCurrentPE(companyOverviewObject)
+	companyOverview := GetInfoFromApi("OVERVIEW", stockSymbol, apiKey)
+	companyOverviewObject := ConvertCompanyOverviewToObject(companyOverview)
+	adjustedPE := AdjustCurrentPE(companyOverviewObject)
 
 	outputPriceEstimates(adjustedPE, averageMargin, projectedRevenue, projectedShares)
 }
@@ -55,7 +57,7 @@ func outputPriceEstimates(adjustedPE float64, averageMargin float64, projectedRe
 	fmt.Printf("30 percent price: %.2f\n", priceEstimate/math.Pow(1.30, 5))
 }
 
-func adjustCurrentPE(companyOverviewObject map[string]string) float64 {
+func AdjustCurrentPE(companyOverviewObject map[string]string) float64 {
 	currentPEString := companyOverviewObject["PERatio"]
 	currentPE, err := strconv.ParseFloat(currentPEString, 64)
 	if err != nil {
@@ -71,13 +73,13 @@ func adjustCurrentPE(companyOverviewObject map[string]string) float64 {
 	return adjustedPE
 }
 
-func calculateAverageMargin(incomeStatementObject financialsResponse) float64 {
+func CalculateAverageMargin(incomeStatementObject FinancialsResponse) float64 {
 	incomeAnnualStatements := incomeStatementObject.AnnualReports
 	var totalMargin float64
 	yearsOfData := len(incomeAnnualStatements)
 
 	// its conceivable there could be a bug if the AnnualReports are returned out order
-	for i := 0; i < yearsOfData - 1; i++ {
+	for i := 0; i < yearsOfData-1; i++ {
 		yearlyNetIncomeString := incomeAnnualStatements[i]["netIncome"]
 		yearlyRevenueString := incomeAnnualStatements[i]["totalRevenue"]
 
@@ -95,7 +97,7 @@ func calculateAverageMargin(incomeStatementObject financialsResponse) float64 {
 		totalMargin += margin
 	}
 	// yearsOfData - 1 because that's the number of comparisons that can be made
-	averageMargin := totalMargin / float64(yearsOfData - 1)
+	averageMargin := totalMargin / float64(yearsOfData-1)
 
 	fmt.Println("")
 	fmt.Printf("avg margin: %f\n", averageMargin)
@@ -103,14 +105,14 @@ func calculateAverageMargin(incomeStatementObject financialsResponse) float64 {
 	return averageMargin
 }
 
-func calculateAverageYearlyMetricGrowth(metric string, financialsObject financialsResponse) float64 {
+func CalculateAverageYearlyMetricGrowth(metric string, financialsObject FinancialsResponse) float64 {
 
 	annualReports := financialsObject.AnnualReports
 	var totalMetricGrowthPercent float64
 	yearsOfData := len(annualReports)
 
 	// its conceivable there could be a bug if the AnnualReports are returned out order
-	for i := 0; i < yearsOfData - 1; i++ {
+	for i := 0; i < yearsOfData-1; i++ {
 		currentMetricString := annualReports[i][metric]
 		previousMetricString := annualReports[i+1][metric]
 
@@ -133,10 +135,10 @@ func calculateAverageYearlyMetricGrowth(metric string, financialsObject financia
 	fmt.Println("")
 	fmt.Printf("%s years of data: %v\n", metric, yearsOfData)
 
-	return fiveYearMetricProjection(metric, averageMetricGrowthPercent, annualReports)
+	return FiveYearMetricProjection(metric, averageMetricGrowthPercent, annualReports)
 }
 
-func fiveYearMetricProjection(metric string, percentChange float64, financialsObject []map[string]string) float64 {
+func FiveYearMetricProjection(metric string, percentChange float64, financialsObject []map[string]string) float64 {
 	var adjustedPercentChange float64
 	switch metric {
 	case "totalRevenue":
@@ -148,13 +150,13 @@ func fiveYearMetricProjection(metric string, percentChange float64, financialsOb
 	}
 
 	projectionMultiple := math.Pow(1+adjustedPercentChange, 5)
-	latestMetricCount, err := strconv.ParseFloat(financialsObject[0][metric], 64)
+	latestMetricValue, err := strconv.ParseFloat(financialsObject[0][metric], 64)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	// divide by 1 mil for easier numbers
-	adjustedMetric := latestMetricCount / 1000000
+	adjustedMetric := latestMetricValue / 1000000
 	metricInFiveYears := projectionMultiple * adjustedMetric
 
 	fmt.Printf("%s latest: %.3f\n", metric, adjustedMetric)
@@ -163,9 +165,8 @@ func fiveYearMetricProjection(metric string, percentChange float64, financialsOb
 	return metricInFiveYears
 }
 
-// can probably change newObject and return type to interface{}
-func convertFinancialsResponseToObject(apiOutput []byte) financialsResponse {
-	var newObject financialsResponse
+func ConvertFinancialsResponseToObject(apiOutput []byte) FinancialsResponse {
+	var newObject FinancialsResponse
 
 	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
 		log.Fatal(err)
@@ -174,7 +175,7 @@ func convertFinancialsResponseToObject(apiOutput []byte) financialsResponse {
 	return newObject
 }
 
-func convertCompanyOverviewToObject(apiOutput []byte) map[string]string {
+func ConvertCompanyOverviewToObject(apiOutput []byte) map[string]string {
 	var newObject map[string]string
 
 	if err := json.Unmarshal(apiOutput, &newObject); err != nil {
@@ -184,7 +185,7 @@ func convertCompanyOverviewToObject(apiOutput []byte) map[string]string {
 	return newObject
 }
 
-func getInfoFromApi(stockFunction string, stockSymbol string, apiKey string) []byte {
+func GetInfoFromApi(stockFunction string, stockSymbol string, apiKey string) []byte {
 	url := fmt.Sprintf("https://www.alphavantage.co/query?function=%s&symbol=%s&apikey=%s", stockFunction, stockSymbol, apiKey)
 
 	req, _ := http.NewRequest("GET", url, nil)

@@ -1,3 +1,3 @@
-module find-stonks
+module find_stonks
 
 go 1.16
