@@ -135,8 +135,10 @@ func CalculateAverageYearlyMetricGrowth(metric string, financialsObject Financia
 	fmt.Println("")
 	fmt.Printf("%s years of data: %v\n", metric, yearsOfData)
 
-	return FiveYearMetricProjection(metric, averageMetricGrowthPercent, annualReports)
+	return FiveYearProjection(metric, averageMetricGrowthPercent, annualReports)
 }
+
+var FiveYearProjection = FiveYearMetricProjection
 
 func FiveYearMetricProjection(metric string, percentChange float64, financialsObject []map[string]string) float64 {
 	var adjustedPercentChange float64

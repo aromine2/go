@@ -21,7 +21,7 @@ func TestAdjustCurrentPE(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			actualResult := AdjustCurrentPE(p.companyOverviewObject)
 			if !reflect.DeepEqual(actualResult, p.expected) {
-				t.Errorf("Expected %v but got %v", p.expected, actualResult)
+				t.Errorf("Got %v but expected %v", actualResult, p.expected)
 			}
 		})
 	}
@@ -47,15 +47,18 @@ func TestFiveYearMetricProjection(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			actualResult := FiveYearMetricProjection(p.metric, p.percentChange, p.financialsObject)
 			if !reflect.DeepEqual(actualResult, p.expected) {
-				t.Errorf("Expected %v but got %v", p.expected, actualResult)
+				t.Errorf("Got %v but expected %v", actualResult, p.expected)
 			}
 		})
 	}
 
 }
 
-// TODO: Mock out FiveYearMetricProjection
 func TestCalculateAverageYearlyMetricGrowth(t *testing.T) {
+	defer func() {
+		FiveYearProjection = FiveYearMetricProjection
+	}()
+
 	testFinancialResponse := FinancialsResponse{Symbol: "AJR", AnnualReports: []map[string]string{
 		0: {"totalRevenue": "199999999", "commonStockSharesOutstanding": "199999990"},
 		1: {"totalRevenue": "155555555", "commonStockSharesOutstanding": "177777770"},
@@ -69,17 +72,23 @@ func TestCalculateAverageYearlyMetricGrowth(t *testing.T) {
 		financialsObject FinancialsResponse
 		expected         float64
 	}{
-		{"totalRevenue", testFinancialResponse, 509.6265244984146},
-		{"commonStockSharesOutstanding", testFinancialResponse, 587.3865729130903},
+		{"totalRevenue", testFinancialResponse, 0.22857142675918365},
+		{"commonStockSharesOutstanding", testFinancialResponse, 0.21858972692054945},
 	}
 
 	for n, p := range tests {
 		testName := fmt.Sprintf("%d", n+1)
 		t.Run(testName, func(t *testing.T) {
-			actualResult := CalculateAverageYearlyMetricGrowth(p.metric, p.financialsObject)
-			if !reflect.DeepEqual(actualResult, p.expected) {
-				t.Errorf("Expected %v but got %v", p.expected, actualResult)
+			FiveYearProjection = func(metric string, percentChange float64, financialsObject []map[string]string) float64 {
+				if !reflect.DeepEqual(metric, p.metric) {
+					t.Errorf("Got %v but expected %v", metric, p.metric)
+				}
+				if !reflect.DeepEqual(percentChange, p.expected) {
+					t.Errorf("Got %v but expected %v", percentChange, p.expected)
+				}
+				return 1
 			}
+			CalculateAverageYearlyMetricGrowth(p.metric, p.financialsObject)
 		})
 	}
 }
@@ -105,7 +114,7 @@ func TestCalculateAverageMargin(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			actualResult := CalculateAverageMargin(p.incomeStatement)
 			if !reflect.DeepEqual(actualResult, p.expected) {
-				t.Errorf("Expected %v but got %v", p.expected, actualResult)
+				t.Errorf("Got %v but expected %v", actualResult, p.expected)
 			}
 		})
 	}
